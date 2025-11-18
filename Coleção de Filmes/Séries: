@@ -1,0 +1,162 @@
+#include <stdio.h>     // printf, scanf, FILE, fopen, fread, fwrite...
+#include <stdlib.h>    // system(), exit()
+#include <string.h>    // strlen, strcpy, strcspn
+#include <ctype.h>     // toupper()
+#include <locale.h>    // setlocale()
+
+
+typedef struct {
+    char titulo[50];
+    char genero[30];
+    int ano;
+} reg;
+
+/* Protótipos das funções */
+void configurar_locale(void);
+void limpa_buffer(void);
+void ler_string(char *s, int tam);
+int tamanho(FILE *arq);
+void cadastrar(FILE *arq);
+void consultar(FILE *arq);
+
+
+void limpa_buffer(void) {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
+}
+
+void ler_string(char *s, int tam) {
+    fgets(s, tam, stdin);
+    s[strcspn(s, "\n")] = '\0'; 
+}
+
+int tamanho(FILE *arq) {
+    long pos_atual = ftell(arq);  
+    fseek(arq, 0, SEEK_END);      
+     long fim = ftell(arq);  
+    fseek(arq, pos_atual, SEEK_SET);
+    return (int)(fim / sizeof(reg));
+
+}
+
+
+void cadastrar(FILE *arq) {
+    reg m;
+    char confirma;
+
+    printf("\n=== CADASTRAR ===\n");
+    printf("Registro número: %d\n", tamanho(arq) + 1);
+
+    printf("Título: ");
+    ler_string(m.titulo, sizeof(m.titulo));
+
+    printf("Gênero: ");
+    ler_string(m.genero, sizeof(m.genero));
+
+    printf("Ano: ");
+    scanf("%d", &m.ano);
+    limpa_buffer();
+
+    printf("Confirmar (s/n)? ");
+    scanf("%c", &confirma);
+    limpa_buffer();
+
+    if (toupper(confirma) == 'S') {
+        fseek(arq, 0, SEEK_END);
+        fwrite(&m, sizeof(reg), 1, arq);
+        fflush(arq);
+        printf("Cadastrada com sucesso!\n");
+    } else {
+        printf("Cadastro cancelado.\n");
+    }
+}
+
+
+void consultar(FILE *arq) {
+    int codigo;
+    reg m;
+
+    printf("\n=== CONSULTAR  ===\n");
+    printf("Informe o código: ");
+    scanf("%d", &codigo);
+    limpa_buffer();
+
+    int total = tamanho(arq);
+
+    if (codigo <= 0 || codigo > total) {
+        printf("Código inválido! Total de registros: %d\n", total);
+        return;
+    }
+
+    long pos_byte = (long)(codigo - 1) * sizeof(reg);
+
+    if (fseek(arq, pos_byte, SEEK_SET) != 0) {
+        printf("Erro no fseek.\n");
+        return;
+    }
+
+    if (fread(&m, sizeof(reg), 1, arq) != 1) {
+        printf("Erro ao ler registro.\n");
+        return;
+    }
+
+    printf("\n=== MÍDIA %d ===\n", codigo);
+    printf("Título : %s\n", m.titulo);
+    printf("Gênero : %s\n", m.genero);
+    printf("Ano    : %d\n", m.ano);
+}
+
+//acentoss
+void configurar_locale(void) {
+#if defined(_WIN32)
+    system("chcp 65001 > nul");
+#endif
+    setlocale(LC_ALL, "pt_BR.UTF-8");
+}
+
+/* -------------------------------------------------------------------------------
+   main — MENU PRINCIPAL
+------------------------------------------------------------------------------- */
+int main(void) {
+    configurar_locale();
+
+    FILE *arq = fopen("midias.dat", "r+b");
+    if (!arq) {
+        arq = fopen("midias.dat", "w+b");
+        if (!arq) {
+            printf("Erro ao abrir arquivo!\n");
+            return 1;
+        }
+    }
+
+    int op;
+
+    do {
+        printf("\n========== COLEÇÃO DE FILMES/SÉRIES ==========\n");
+        printf("1. Cadastrar mídia\n");
+        printf("2. Consultar mídia\n");
+        printf("3. Sair\n");
+        printf("----------------------------------------------\n");
+        printf("Total de registros: %d\n", tamanho(arq));
+        printf("Opção: ");
+
+        if (scanf("%d", &op) != 1) {
+            printf("Opção inválida!\n");
+            limpa_buffer();
+            continue;
+        }
+        limpa_buffer();
+
+        switch (op) {
+            case 1: cadastrar(arq); break;
+            case 2: consultar(arq); break;
+            case 3: printf("Saindo...\n"); break;
+            default: printf("Opção inválida!\n");
+        }
+
+    } while (op != 3);
+
+    fclose(arq);
+    return 0;
+}
+
